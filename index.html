@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Optimized VATSIM Planes on Google Maps</title>
+  <style>
+    /* Set the size of the map */
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
+    footer {
+      color: white;
+      background-color: black;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    body {
+      background-color: black;
+     color: white;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+  let map;
+  let markers = {};  // Store plane markers by callsign to reuse them
+  const airportMarkers = {};  // Store airport markers
+
+  // List of large airports with their coordinates
+  const airports = [
+    { name: "Louisville International Airport", lat: 38.1986, lng: -85.7362, code: "KSDF" },
+    { name: "Hartsfield-Jackson Atlanta International Airport", lat: 33.6407, lng: -84.4279, code: "ATL" },
+    { name: "Los Angeles International Airport", lat: 33.9416, lng: -118.4085, code: "LAX" },
+    { name: "Chicago O'Hare International Airport", lat: 41.9742, lng: -87.9073, code: "ORD" },
+    { name: "Dallas/Fort Worth International Airport", lat: 32.8968, lng: -97.0382, code: "DFW" },
+    { name: "John F. Kennedy International Airport", lat: 40.6413, lng: -73.7781, code: "JFK" },
+    { name: "Miami International Airport", lat: 25.7957, lng: -80.2870, code: "MIA" },
+    { name: "Denver International Airport", lat: 39.8561, lng: -104.6737, code: "DEN" },
+    { name: "Seattle-Tacoma International Airport", lat: 47.4502, lng: -122.3088, code: "SEA" },
+    { name: "San Francisco International Airport", lat: 37.6213, lng: -122.3790, code: "SFO" },
+    { name: "McCarran International Airport", lat: 36.08, lng: -115.15, code: "LAS" },
+    { name: "Phoenix Sky Harbor International Airport", lat: 33.4342, lng: -112.0126, code: "PHX" },
+    { name: "George Bush Intercontinental Airport", lat: 29.9844, lng: -95.3415, code: "IAH" },
+    { name: "Charlotte Douglas International Airport", lat: 35.2140, lng: -80.9431, code: "CLT" },
+    { name: "Boston Logan International Airport", lat: 42.3656, lng: -71.0096, code: "BOS" }
+  ];
+
+  // Initialize the map
+  function initMap() {
+    var centerLocation = { lat: 40.7128, lng: -74.0060 };  // Center at New York City (you can change this)
+
+    // Create the map with satellite view
+    map = new google.maps.Map(document.getElementById('map'), {
+      zoom: 5,  // Adjust as necessary
+      center: centerLocation,
+      mapTypeId: 'satellite'  // Set the map type to satellite
+    });
+
+    // Add airport markers to the map
+    airports.forEach(airport => {
+      airportMarkers[airport.code] = new google.maps.Marker({
+        position: { lat: airport.lat, lng: airport.lng },
+        map: map,
+        title: airport.name,
+        icon: {
+          url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',  // Custom icon for airports
+          scaledSize: new google.maps.Size(30, 30)
+        }
+      });
+    });
+
+    // Fetch VATSIM data every 30 seconds
+    setInterval(fetchVATSIMData, 10000);
+    fetchVATSIMData();  // Initial fetch
+  }
+
+  // Function to fetch VATSIM data
+  function fetchVATSIMData() {
+    fetch('https://data.vatsim.net/v3/vatsim-data.json')
+      .then(response => response.json())
+      .then(data => {
+        const planes = data.pilots;  // List of planes (pilots)
+        updateMarkers(planes);  // Update the map with the plane data
+      })
+      .catch(error => console.error('Error fetching VATSIM data:', error));
+  }
+
+  // Update markers based on the VATSIM data
+  function updateMarkers(planes) {
+    const bounds = map.getBounds();  // Get the current map viewport bounds
+
+    planes.forEach(plane => {
+      const lat = plane.latitude;
+      const lng = plane.longitude;
+      const callsign = plane.callsign;
+      const heading = plane.heading;
+
+      // Only update planes within the current map bounds (to reduce lag)
+      if (bounds && bounds.contains({ lat: lat, lng: lng })) {
+        // Check if a marker already exists for this callsign
+        if (markers[callsign]) {
+          // Update the existing marker's position and heading
+          markers[callsign].setPosition({ lat: lat, lng: lng });
+          markers[callsign].setIcon({
+            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+            scale: 4,
+            rotation: heading,
+            fillColor: '#ff0000',
+            fillOpacity: 1,
+            strokeWeight: 2,
+            strokeColor: '#000000'
+          });
+        } else {
+          // Create a new marker if it doesn't exist
+          markers[callsign] = new google.maps.Marker({
+            position: { lat: lat, lng: lng },
+            map: map,
+            title: `${callsign}`,
+            icon: {
+              path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,  // Plane symbol
+              scale: 4,
+              rotation: heading,  // Rotate the symbol based on the heading
+              fillColor: '#ff0000',
+              fillOpacity: 1,
+              strokeWeight: 2,
+              strokeColor: '#000000'
+            }
+          });
+        }
+      }
+    });
+
+    // Remove markers that are no longer in the VATSIM data
+    Object.keys(markers).forEach(callsign => {
+      if (!planes.find(plane => plane.callsign === callsign)) {
+        markers[callsign].setMap(null);  // Remove the marker from the map
+        delete markers[callsign];  // Delete the marker from the markers object
+      }
+    });
+  }
+</script>
+
+<!-- Google Maps API with your API key -->
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB3qAHjYLClDjXtB7uO77URXE4t_57Bg-4&callback=initMap">
+</script>
+
+</body>
+  
+</html>
+<footer><P>WIP, Made by Jack Sampson 2024-2024</P></footer>
